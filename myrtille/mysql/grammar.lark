@@ -1,0 +1,673 @@
+create_table: "CREATE"i "TABLE"i  identifier ["(" table_element_list ")"] [create_table_options] [partition_clause]
+
+ 
+partition_clause: "PARTITION"i "BY"i partition_type_def ["PARTITIONS"i int_literal] [sub_partitions] [partition_definitions]
+
+partition_definitions: "(" partition_definition ("," partition_definition)* ")"
+
+partition_definition: "PARTITION"i identifier [ "VALUES"i "LESS"i "THAN"i (partition_value_item_list_paren | "MAXVALUE"i) | "VALUES"i "IN"i partition_values_in] partition_option* ["("i subpartition_definition (","i subpartition_definition)* ")"i]
+
+subpartition_definition: "SUBPARTITION"i identifier partition_option*
+
+partition_option: "TABLESPACE"i ["="] identifier
+                  | ["STORAGE"i] "ENGINE"i ["="] identifier
+                  |"NODEGROUP"i ["="] int_literal
+                  |("MAX_ROWS"i | "MIN_ROWS"i) ["="] int_literal
+                  |("DATA"i | "INDEX"i) "DIRECTORY"i ["="] text_literal
+                  |"COMMENT"i ["="] text_literal
+
+partition_values_in: partition_value_item_list_paren
+                     | "(" partition_value_item_list_paren ("," partition_value_item_list_paren)* ")"
+
+partition_value_item_list_paren: "(" partition_value_item ("," partition_value_item)* ")"
+
+partition_value_item: [expr] | "MAXVALUE"i
+
+partition_type_def: ["LINEAR"i] "KEY"i [partition_key_algorithm] "(" [identifier_list] ")"
+                    | ["LINEAR"i] "HASH"i expr_with_par                    
+                    | ("RANGE"i | "LIST"i) (expr_with_par | COLUMNS "(" [identifier_list] ")")
+
+sub_partitions: "SUBPARTITION"i "BY"i ["LINEAR"i] ("HASH"i expr_with_par | "KEY"i [partition_key_algorithm] identifier_list_with_par) ["SUBPARTITIONS"i int_literal]
+
+partition_key_algorithm: "1" | "2"
+
+create_table_options: create_table_option ([","] create_table_option)*
+
+
+create_table_option: "ENGINE"i ["="] identifier                          -> engine_create_option
+                   | "MAX_ROWS"i ["="] int_literal                       -> max_rows_create_option
+                   | "MIN_ROWS"i ["="] int_literal                       -> min_rows_create_option
+                   | "AVG_ROW_LENGTH"i ["="] int_literal                 -> avg_row_length_create_option
+                   | "PASSWORD"i ["="] text_literal                      -> password_create_option
+                   | "COMMENT"i ["="] text_literal                       -> comment_create_option
+                   | "COMPRESSION"i ["="] text_literal                   -> compression_create_option
+                   | "ENCRYPTION"i ["="] text_literal                    -> encryption_create_option
+                   | "AUTO_INCREMENT"i ["="] int_literal                 -> auto_increment_create_option
+                   | "PACK_KEYS"i ["="] ternary_option                   -> pack_keys_create_option
+                   | "STATS_AUTO_RECALC"i ["="] ternary_option           -> stats_auto_recalc_create_option
+                   | "STATS_PERSISTENT"i ["="] ternary_option            -> stats_persistent_create_option
+                   | "STATS_SAMPLE_PAGES"i ["="] ternary_option          -> stats_sample_pages_create_option
+                   | ("CHECKSUM"i | "TABLE_CHECKSUM"i) ["="] int_literal -> checksum_create_option
+                   | "DELAY_KEY_WRITE"i ["="] int_literal                -> delay_key_write_create_option
+                   | "ROW_FORMAT"i ["="] row_format                      -> row_format_create_option
+                   | "UNION"i ["="] "(" qual_identifier_list ")"         -> union_create_option
+                   | ["DEFAULT"i] charset ["="] charset_value            -> charset_create_option
+                   | ["DEFAULT"i] "COLLATE"i ["="] identifier            -> collate_create_option
+                   | "INSERT_METHOD"i ["="] insert_method                -> insert_method_create_option
+                   | "DATA"i "DIRECTORY"i ["="] text_literal             -> data_directory_create_option
+                   | "INDEX"i "DIRECTORY"i ["="] text_literal            -> index_directory_create_option
+                   | "TABLESPACE"i identifier                            -> tablespace_create_option
+                   | "STORAGE"i storage_type                             -> storage_create_option
+                   | "CONNECTION"i ["="] text_literal                    -> connection_create_option
+                   | "KEY_BLOCK_SIZE"i ["="] int_literal                 -> key_block_size_create_option
+
+row_format: "DEFAULT"i    -> default_row_format
+          | "DYNAMIC"i    -> dynamic_row_format
+          | "FIXED"i      -> fixed_row_format
+          | "COMPRESSED"i -> compressed_row_format
+          | "REDUNDANT"i  -> redundant_row_format
+          | "COMPACT"i    -> compact_row_format
+
+insert_method: "NO"i | "FIRST"i | "LAST"i
+storage_type: "DISK"i | "MEMORY"i
+
+table_element_list: table_element ("," table_element)*
+table_element: column_definition | table_constraint_def
+
+
+
+table_constraint_def:   key_or_index               [identifier] [index_type_clause] key_list      index_option*            -> index_constraint
+    | [constraint_name] "PRIMARY"i "KEY"i          [identifier] [index_type_clause] key_list      index_option*            -> primary_constraint
+    | [constraint_name] "UNIQUE"i   [key_or_index] [identifier] [index_type_clause] key_list      index_option*            -> unique_constraint
+    |                   "FULLTEXT"i [key_or_index] [identifier]                     key_list      index_option*            -> fulltext_constraint
+    |                   "SPATIAL"i  [key_or_index] [identifier]                     key_list      index_option*            -> spatial_constraint
+    | [constraint_name] "FOREIGN"i "KEY"i          [identifier]                     key_list      references               -> foreign_contraint
+    | [constraint_name] "CHECK"i                                                    expr_with_par [constraint_enforcement] -> check_contraint
+        
+
+constraint_name: "CONSTRAINT"i [identifier]
+
+index_type: "BTREE"i -> btree_index_type
+          | "RTREE"i -> rtree_index_type
+          | "HASH"i  -> hash_index_type
+
+index_type_clause: ("USING"i | "TYPE"i) index_type
+
+key_list: "(" key_part ("," key_part)* ")"
+
+key_part: identifier [int_arg] [direction] -> identifier_key_part
+        | expr_with_par [direction]        -> expr_key_part
+
+
+index_option: "KEY_BLOCK_SIZE"i ["="] int_literal -> key_block_size_index_option
+            | "COMMENT"i text_literal             -> comment_index_option
+            | "VISIBLE"i                          -> visible_index_option
+            | "INVISIBLE"i                        -> invisible_index_option
+            // primary - unique - key
+            | index_type_clause                   -> type_index_option
+            // fulltext
+            | "WITH"i "PARSER"i identifier        -> with_parser_index_option
+
+
+
+column_definition: identifier data_type attribute*
+ 
+
+data_type:    TINYINT [int_arg]                -> tinyint_data_type
+            | SMALLINT [int_arg]               -> smallint_data_type
+            | MEDIUMINT [int_arg]              -> mediumint_data_type
+            | INT [int_arg]                    -> int_data_type
+            | BIGINT [int_arg]                 -> bigint_data_type
+            | DECIMAL [int_arg | int_pair_arg] -> fixed_point_data_type
+            | FLOAT [int_arg | int_pair_arg]   -> float_data_type
+            | REAL [int_pair_arg]              -> double_data_type
+            | BOOL                             -> bool_data_type
+            | "SERIAL"i                        -> serial_data_type
+            | "BIT"i [int_arg]                 -> bit_data_type
+            //
+            | "DATE"i                -> date_data_type
+            | "DATETIME"i [int_arg]  -> datetime_data_type
+            | "TIMESTAMP"i [int_arg] -> timestamp_data_type
+            | "TIME"i [int_arg]      -> time_data_type
+            | YEAR ["(" "4" ")"]     -> year_data_type
+            //
+            | CHAR [int_arg]   -> char_data_type
+            | nchar [int_arg]  -> nchar_data_type
+            | varchar int_arg  -> varchar_data_type
+            | nvarchar int_arg -> nvarchar_data_type
+            //
+            | binary [int_arg]  -> binary_data_type
+            | "VARBINARY"i int_arg -> varbinary_data_type
+            //
+            | "TINYBLOB"i       -> tinyblob_data_type
+            | "TINYTEXT"i       -> tinytext_data_type
+            | "BLOB"i [int_arg] -> blob_data_type
+            | "TEXT"i [int_arg] -> text_data_type
+            | "MEDIUMBLOB"i     -> mediumblob_data_type
+            | MEDIUM_TEXT       -> mediumtext_data_type
+            | "LONGBLOB"i       -> longblob_data_type
+            | "LONGTEXT"i       -> longtext_data_type
+            //
+            | "ENUM"i text_list -> enum_data_type
+            | "SET"i text_list  -> set_data_type
+            //
+            | "GEOMETRY"i           -> geometry_data_type
+            | "POINT"i              -> point_data_type
+            | "LINESTRING"i         -> linestring_data_type
+            | "POLYGON"i            -> polygon_data_type
+            | "MULTIPOINT"i         -> multipoint_data_type
+            | "MULTILINESTRING"i    -> multilinestring_data_type
+            | "MULTIPOLYGON"i       -> multipolygon_data_type
+            | GEOMETRYCOLLECTION    -> geometrycollection_data_type
+            //
+            | "JSON"i -> json_data_type
+
+
+attribute: NOT "NULL"i                                                    -> non_nullable_attribute
+         | "NULL"i                                                        -> nullable_attribute
+         | "DEFAULT"i literal                                             -> literal_default_attribute
+         | "DEFAULT"i expr_with_par                                       -> expr_default_attribute
+         | "DEFAULT"i NOW [int_arg]                                       -> now_default_attribute
+         | ["GENERATED"i "ALWAYS"i] "AS"i expr_with_par [generation_type] -> generated_attribute
+         | "ON"i "UPDATE"i NOW [int_arg]                                  -> on_update_attribute
+         | "COMMENT"i text_literal                                        -> comment_attribute
+         | "COLUMN_FORMAT"i column_format                                 -> column_format_attribute
+         | "STORAGE"i storage_media                                       -> storage_attribute
+         | "INVISIBLE"i                                                   -> invisible_attribute
+         | "VISIBLE"i                                                     -> visible_attribute
+         //
+         | "AUTO_INCREMENT"i                                              -> auto_increment_attribute
+         | "UNSIGNED"i                                                    -> unsigned_attribute
+         | "ZEROFILL"i                                                    -> zerofill_attribute
+         | charset charset_value                                          -> charset_attribute
+         | "COLLATE"i identifier                                          -> collate_attribute              
+         | "SRID"i int_literal                                            -> srid_attribute
+
+references: "REFERENCES"i qual_identifier [identifier_list_with_par] ["MATCH"i ref_match_type] ref_rule*
+
+
+column_format:    "FIXED"i   -> fixed_column_format 
+                | "DYNAMIC"i -> dynamic_column_format
+                | "DEFAULT"i -> default_column_format
+
+storage_media:    "DISK"i    -> disk_storage_media
+                | "MEMORY"i  -> memory_storage_media
+                | "DEFAULT"i -> default_storage_media
+
+generation_type:  "VIRTUAL"i -> virtual_generation_type
+                | "STORED"i  -> stored_generation_type
+
+constraint_enforcement: "ENFORCED"i      -> enforced_constraint_enforcement
+                       | NOT "ENFORCED"i -> not_enforced_constraint_enforcement
+
+charset_value:    identifier         -> custom_charset
+                | "BINARY"i          -> binary_charset
+
+
+ref_match_type: "FULL"i    -> full_ref_match_type
+              | "PARTIAL"i -> partial_ref_match_type
+              | "SIMPLE"i  -> simple_ref_match_type
+
+ref_rule: "ON"i "UPDATE"i ref_action -> on_update_ref_rule
+        | "ON"i "DELETE"i ref_action -> on_delete_ref_rule
+
+ref_action: "RESTRICT"i     -> restrict_ref_action
+          | "CASCADE"i      -> cascade_ref_action
+          | "SET"i "NULL"i  -> set_null_ref_action
+          | "NO"i "ACTION"i -> no_action_ref_action
+
+// Expression
+
+expr: bool_pri ["IS"i [NOT] ("TRUE"i | "FALSE"i | "UNKNOWN"i)]
+    | NOT expr                                                                  
+    | expr ("AND"i | "&&") expr                               
+    | expr "XOR"i expr                                                             
+    | expr ("OR"i | "||") expr                                 
+bool_pri: predicate                                           
+    | bool_pri "IS"i [NOT] "NULL"i            
+    | bool_pri comp_op predicate                          
+    | bool_pri comp_op ("ALL"i | ANY) query_expression_parens 
+comp_op: "="| "<=>" | ">=" | ">" | "<=" | "<" | "!=" | "<>"
+predicate: bit_expr [[NOT] predicate_operations | "MEMBER"i ["OF"i] simple_expr_with_parentheses | "SOUNDS"i "LIKE"i bit_expr]
+predicate_operations: "IN"i (query_expression_parens | "(" expr_list ")") 
+                    | "BETWEEN"i bit_expr "AND"i predicate                    
+                    | "LIKE"i simple_expr ["ESCAPE"i simple_expr]            
+                    | REGEXP bit_expr     
+bit_expr: simple_expr
+        | bit_expr "^" bit_expr
+        | bit_expr ("*" | "/" | "%" | "DIV"i | "MOD"i) bit_expr
+        | bit_expr ("+" | "-") bit_expr
+        | bit_expr ("+" | "-") "INTERVAL"i expr interval
+        | bit_expr ("<<" | ">>") bit_expr
+        | bit_expr "&" bit_expr
+        | bit_expr "|" bit_expr
+simple_expr: variable [equal expr]                                                                               
+            | field_identifier [json_operator]                                                                          
+            | runtime_function_call                                                                                
+            | function_call                                                                                       
+            | simple_expr "COLLATE"i text_or_identifier                                                         
+            | literal                                                                                            
+            | "?"                                                                                       
+            | sum_expr                                                                                            
+            | grouping_operation                                                        
+            | window_function_call                                                       
+            | simple_expr "CONCAT_PIPES"i simple_expr                                                          
+            | ("+" | "-" | "~") simple_expr                            
+            | ("!" | "NOT2"i) simple_expr                                                                                
+            | ["ROW"i] "(" expr_list ")"                                              
+            | ["EXISTS"i] query_expression_parens                                                                            
+            | "{"i identifier expr "}"i                                               
+            | "MATCH"i ident_list_arg "AGAINST"i "(" bit_expr [fulltext_options] ")" 
+            | "BINARY"i simple_expr                                                                           
+            | "CAST"i "(" expr "AS"i cast_type [array_cast] ")"                    
+            | "CASE"i [expr] (when_expression then_expression)+ [else_expression] "END"i                      
+            | "CONVERT"i "(" expr "," cast_type ")"                         
+            | "CONVERT"i "(" expr "USING"i charset_value ")"                      
+            | "DEFAULT"i "(" simple_identifier ")"                                   
+            | "VALUES"i "(" simple_identifier ")"                                    
+            | "INTERVAL"i expr interval "+" expr                                                   
+else_expression: "ELSE"i expr
+then_expression: "THEN"i expr
+when_expression: "WHEN"i expr
+array_cast: "ARRAY"i
+cast_type: "BINARY"i [int_arg]
+        | CHAR [int_arg] [charset_with_opt_binary]
+        | nchar [int_arg]
+        | "SIGNED"i [INT]
+        | "UNSIGNED"i [INT]
+        | "DATE"i
+        | "TIME"i [int_arg]
+        | "DATETIME"i [int_arg]
+        | DECIMAL [int_arg | int_pair_arg]
+        | "JSON"i
+        | REAL
+        | FLOAT [int_pair_arg]
+charset_with_opt_binary: ascii | unicode | "BYTE"i | charset charset_value ["BINARY"i] | "BINARY"i [charset charset_value]
+unicode: "UNICODE"i ["BINARY"i] | "BINARY"i "UNICODE"i
+ascii: "ASCII"i ["BINARY"i] | "BINARY"i "ASCII"i
+fulltext_options: "IN"i BOOL "MODE"i 
+            | "IN"i "NATURAL"i "LANGUAGE"i "MODE"i ["WITH"i "QUERY"i "EXPANSION"i]
+            | "WITH"i "QUERY"i "EXPANSION"i
+ident_list_arg: ident_list | "(" ident_list ")"
+ident_list: simple_identifier ("," simple_identifier)*
+simple_identifier: identifier [dot_identifier [dot_identifier]]
+query_expression_parens:"(" (query_expression_parens | query_expression [locking_clause_list]) ")"
+locking_clause_list: locking_clause+
+locking_clause: "FOR"i lock_strengh ["OF"i table_alias_ref_list] [locked_row_action] | "LOCK"i "IN"i "SHARE"i "MODE"i
+locked_row_action: "SKIP"i "LOCKED"i | "NOWAIT"i
+table_alias_ref_list: table_ref_with_wildcard ("," table_ref_with_wildcard)*
+table_ref_with_wildcard: identifier ["." "*" | dot_identifier ["." "*"]]
+lock_strengh: "UPDATE"i | "SHARE"i
+query_expression: [with_clause] (query_expression_body [order_clause] [limit_clause] | query_expression_parens [order_clause] [limit_clause])
+limit_clause: "LIMIT"i limit_options
+limit_options: limit_option [("COMMA"i | "OFFSET"i) limit_option]
+limit_option: identifier | "?" | int_literal
+query_expression_body: (query_primary | query_expression_parens "UNION"i [union_option] (query_primary | query_expression_parens)) ("UNION"i [union_option] ( query_primary | query_expression_parens))*
+union_option: DISTINCT | "ALL"i
+query_primary: query_specification | table_value_constructor | explicit_table
+explicit_table: "TABLE"i table_ref
+table_ref: qual_identifier | dot_identifier
+table_value_constructor: "VALUES"i row_value_explicit ("," row_value_explicit)*
+row_value_explicit: "ROW"i "(" [values] ")"
+values: (expr | "DEFAULT"i) ("," (expr | "DEFAULT"i))*
+query_specification: "SELECT"i select_option* select_item_list [into_clause] [from_clause] [where_clause] [group_by_clause] [having_clause] [window_clause]
+window_clause: "WINDOW"i window_definition ("," window_definition)*
+window_definition: identifier "AS"i window_spec
+window_spec: "(" window_spec_details ")"
+having_clause: "HAVING"i expr
+group_by_clause: "GROUP"i "BY"i order_list [olap_option]
+olap_option: "WITH"i "ROLLUP"i
+where_clause: "WHERE"i expr
+from_clause: "FROM"i ("DUAL"i | table_reference_list)
+table_reference_list: table_reference ("COMMA"i table_reference)*
+table_reference: (table_factor | "{" "OJ"i escaped_table_reference "}") joined_table*
+escaped_table_reference: table_factor joined_table*
+joined_table: inner_join_type table_reference ["ON"i expr| "USING"i identifier_list_with_par]
+    | outer_join_type table_reference ("ON"i expr | "USING"i identifier_list_with_par)
+    | natural_join_type table_factor
+natural_join_type: "NATURAL"i ["INNER"i | ("LEFT"i | "RIGHT"i) ["OUTER"i]] "JOIN"i
+outer_join_type: ("LEFT"i | "RIGHT"i) ["OUTER"i] "JOIN"i
+inner_join_type: ["INNER"i | "CROSS"i] "JOIN"i | "STRAIGHT_JOIN"i
+table_factor: single_table | single_table_parens | derived_table | table_reference_list_parens | table_function
+table_function: "JSON_TABLE"i "(" expr "," quoted_text columns_clause ")" [table_alias]
+columns_clause: COLUMNS "(" jt_column ("," jt_column)* ")"
+jt_column: identifier "FOR"i "ORDINALITY"i
+        | identifier data_type ["COLLATE" text_or_identifier] ["EXISTS"i] "PATH"i quoted_text [on_empty_or_error]
+        | "NESTED"i "PATH"i quoted_text columns_clause
+on_empty_or_error: on_empty [on_error] | on_error [on_empty]
+on_empty: jt_on_response "ON"i "EMPTY"i
+on_error: jt_on_response "ON"i "ERROR"i
+jt_on_response: "ERROR"i | "NULL"i | "DEFAULT"i quoted_text
+table_reference_list_parens: "(" (table_reference_list | table_reference_list_parens) ")"
+derived_table: query_expression_parens [table_alias] [identifier_list_with_par]
+            | "LATERAL"i query_expression_parens [table_alias] [identifier_list_with_par]
+single_table_parens: "(" (single_table | single_table_parens) ")"
+single_table: table_ref [use_partition] [table_alias] [index_hint_list]
+index_hint_list: index_hint (","i index_hint)*
+index_hint: index_hint_type key_or_index  [index_hint_clause] "("i index_list ")"i
+            | "USE"i key_or_index  [index_hint_clause] "("i [index_list] ")"i
+index_list: index_list_element ("," index_list_element)*
+index_list_element: identifier | "PRIMARY"i
+index_hint_clause: "FOR"i ("JOIN"i | "ORDER"i "BY"i | "GROUP"i "BY"i)
+index_hint_type: "FORCE"i | "IGNORE"i
+table_alias: ["AS"i] identifier
+use_partition: "PARTITION"i identifier_list_with_par
+into_clause: "INTO"i ("OUTFILE"i quoted_text [charset charset_value] [fields_clause] [lines_clause]
+                    | "DUMPFILE"i quoted_text
+                    | (text_or_identifier | user_variable) ("," (text_or_identifier | user_variable))*)
+lines_clause: "LINES"i line_term+
+line_term: ("TERMINATED"i | "STARTING"i) "BY"i quoted_text
+fields_clause: COLUMNS field_term+
+field_term: "TERMINATED"i "BY"i quoted_text | ["OPTIONALLY"i] "ENCLOSED"i "BY"i quoted_text | "ESCAPED"i "BY"i quoted_text
+select_item_list: (select_item | "*") ("," select_item)*
+select_item: table_wild | expr [select_alias]
+select_alias: ["AS"i] text_or_identifier
+table_wild: identifier "." [identifier "."] "*"
+select_option: query_spec_option | "SQL_NO_CACHE"i
+query_spec_option: "ALL"i
+                 | DISTINCT
+                 | "STRAIGHT_JOIN"i
+                 | "HIGH_PRIORITY"i
+                 | "SQL_SMALL_RESULT"i
+                 | "SQL_BIG_RESULT"i
+                 | "SQL_BUFFER_RESULT"i
+                 | "SQL_CALC_FOUND_ROWS"i
+with_clause: "WITH"i ["RECURSIVE"i] common_table_expression ("," common_table_expression)*
+common_table_expression: identifier [identifier_list_with_par] "AS"i query_expression_parens
+window_function_call: ("ROW_NUMBER"i | "RANK"i | "DENSE_RANK"i | "CUME_DIST"i | "PERCENT_RANK"i) parentheses windowing_clause
+    | "NTILE"i simple_expr_with_parentheses windowing_clause
+    | ("LEAD"i | "LAG"i) "(" expr [lead_lag_info] ")" [null_treatment] windowing_clause
+    | ("FIRST_VALUE"i | "LAST_VALUE"i) expr_with_par [null_treatment] windowing_clause
+    | "NTH_VALUE"i "(" expr "," simple_expr ")" ["FROM"i ("FIRST"i | "LAST"i)] [null_treatment] windowing_clause
+null_treatment: ("RESPECT"i | "IGNORE"i) "NULLS"i
+lead_lag_info: "," (int_literal | "?") ["," expr]
+simple_expr_with_parentheses: "(" simple_expr ")"
+grouping_operation: "GROUPING"i "(" expr_list ")"
+sum_expr: "AVG"i "(" [DISTINCT] in_sum_expr ")" [windowing_clause]
+    | ("BIT_AND"i | "BIT_OR"i | "BIT_XOR"i) "(" in_sum_expr ")" [windowing_clause]
+    | json_function
+    | "COUNT"i "(" ["ALL"i] "*" ")" [windowing_clause]
+    | "COUNT"i "(" (["ALL"i] "*" | in_sum_expr | DISTINCT expr_list) ")" [windowing_clause]
+    | "MIN"i "(" [DISTINCT] in_sum_expr ")" [windowing_clause]
+    | "MAX"i "(" [DISTINCT] in_sum_expr ")" [windowing_clause]
+    | "STD"i "(" in_sum_expr ")" [windowing_clause]
+    | "VARIANCE"i "(" in_sum_expr ")" [windowing_clause]
+    | "STDDEV_SAMP"i "(" in_sum_expr ")" [windowing_clause]
+    | "VAR_SAMP"i "(" in_sum_expr ")" [windowing_clause]
+    | "SUM"i "(" [DISTINCT] in_sum_expr ")" [windowing_clause]
+    | "GROUP_CONCAT"i "(" [DISTINCT] expr_list [order_clause] ["SEPARATOR"i quoted_text] ")" [windowing_clause]
+json_function: "JSON_ARRAYAGG"i "(" in_sum_expr ")" [windowing_clause]
+            | "JSON_OBJECTAGG"i "(" in_sum_expr "," in_sum_expr ")" [windowing_clause]
+windowing_clause: "OVER"i (identifier | "(" window_spec_details ")")
+window_spec_details: [identifier] ["PARTITION"i "BY"i order_list] [order_clause] [window_frame_clause]
+window_frame_clause: window_frame_units window_frame_extent [window_frame_exclusion]
+window_frame_exclusion: "EXCLUDE"i ("CURRENT"i "ROW"i | "GROUP"i | "TIES"i | "NO"i "OTHERS"i)
+window_frame_extent: window_frame_start | window_frame_between
+window_frame_start: "UNBOUNDED"i "PRECEDING"i
+                | int_literal "PRECEDING"i
+                | "?" "PRECEDING"i
+                | "INTERVAL"i expr interval "PRECEDING"i
+                | "CURRENT"i "ROW"i
+window_frame_between: "BETWEEN"i window_frame_bound "AND"i window_frame_bound
+window_frame_bound: window_frame_start
+                | "UNBOUNDED"i "FOLLOWING"i
+                | int_literal "FOLLOWING"i
+                | "?" "FOLLOWING"i
+                | "INTERVAL"i expr interval "FOLLOWING"i
+window_frame_units: "ROWS"i | "RANGE"i | "GROUPS"i
+order_clause: "ORDER"i "BY"i order_list
+order_list: order_expression ("," order_expression)*
+order_expression: expr [direction]
+in_sum_expr: ["ALL"i] expr
+function_call: identifier "(" [udf_expr_list] ")" | qual_identifier "(" [expr_list] ")"
+udf_expr_list:udf_expr ("," udf_expr)*
+udf_expr: expr [["AS"i] text_or_identifier]
+runtime_function_call: CHAR "(" expr_list ["USING"i charset_value] ")"
+                    | "CURRENT_USER"i [parentheses]
+                    | "DATE"i expr_with_par
+                    | DAY expr_with_par
+                    | HOUR expr_with_par
+                    | "INSERT"i "(" expr "," expr "," expr "," expr ")"
+                    | "INTERVAL"i "(" expr ("," expr)+ ")"
+                    | "LEFT"i "(" expr "," expr ")"
+                    | MINUTE expr_with_par
+                    | MONTH expr_with_par
+                    | "RIGHT"i "(" expr "," expr ")"
+                    | SECOND expr_with_par
+                    | "TIME"i expr_with_par
+                    | "TIMESTAMP"i "(" expr ["," expr] ")"
+                    | trim_function
+                    | "USER"i parentheses
+                    | "VALUES"i expr_with_par
+                    | YEAR expr_with_par
+                    // Function names that are not keywords.
+                    | ("ADDDATE"i | "SUBDATE"i) "(" expr "," (expr | "INTERVAL"i expr interval) ")"
+                    | "CURDATE"i [parentheses]
+                    | "CURTIME"i [int_arg]
+                    | ("DATE_ADD"i | "DATE_SUB"i) "(" expr "," "INTERVAL"i expr interval ")"
+                    | "EXTRACT"i "(" interval "FROM"i expr ")"
+                    | "GET_FORMAT"i "(" date_time_ttype "," expr ")"
+                    | NOW [int_arg]
+                    | "POSITION"i "(" bit_expr "IN"i expr ")"
+                    | substring_function
+                    | "SYSDATE"i [int_arg]
+                    | ("TIMESTAMP_ADD"i | "TIMESTAMP_DIFF"i) "(" interval_time_stamp "," expr "," expr ")"
+                    | "UTC_DATE"i [parentheses]
+                    | "UTC_TIME"i [int_arg]
+                    | "UTC_TIMESTAMP"i [int_arg]
+                    // Function calls with other conflicts.
+                    | "ASCII"i expr_with_par
+                    | "CHARSET"i expr_with_par
+                    | "COALESCE"i expr_list_with_parentheses
+                    | "COLLATION"i expr_with_par
+                    | DATABASE parentheses
+                    | "IF"i "(" expr "," expr "," expr ")"
+                    | "FORMAT"i "(" expr "," expr ["," expr] ")"
+                    | "MICROSECOND"i expr_with_par
+                    | "MOD"i "(" expr "," expr ")"
+                    | QUARTER expr_with_par
+                    | "REPEAT"i "(" expr "," expr ")"
+                    | "REPLACE"i "(" expr "," expr "," expr ")"
+                    | "REVERSE"i expr_with_par
+                    | "ROW_COUNT"i parentheses
+                    | "TRUNCATE"i "(" expr "," expr ")"
+                    | WEEK "(" expr ["," expr] ")"
+                    | "WEIGHT_STRING"i "(" expr (["AS"i CHAR ws_num_codepoints]
+                                                | "AS"i "BINARY"i ws_num_codepoints
+                                                | "," int_literal "," int_literal "," int_literal) ")"
+                    | geometry_function
+geometry_function: GEOMETRYCOLLECTION "(" [expr_list] ")"
+                 | "LINESTRING"i expr_list_with_parentheses
+                 | "MULTILINESTRING"i expr_list_with_parentheses
+                 | "MULTIPOINT"i expr_list_with_parentheses
+                 | "MULTIPOLYGON"i expr_list_with_parentheses
+                 | "POINT"i "(" expr "," expr ")"
+                 | "POLYGON"i expr_list_with_parentheses
+ws_num_codepoints: "(" int_literal ")"
+expr_list_with_parentheses: "(" expr_list ")"
+substring_function: "SUBSTRING"i "(" expr ("," expr ["," expr] | "FROM"i expr ["FOR"i expr]) ")"
+date_time_ttype: "DATE"i | "TIME"i | "DATETIME"i | "TIMESTAMP"i
+interval: interval_time_stamp
+        | "SECOND_MICROSECOND"i
+        | "MINUTE_MICROSECOND"i
+        | "MINUTE_SECOND"i
+        | "HOUR_MICROSECOND"i
+        | "HOUR_SECOND"i
+        | "HOUR_MINUTE"i
+        | "DAY_MICROSECOND"i
+        | "DAY_SECOND"i
+        | "DAY_MINUTE"i
+        | "DAY_HOUR"i
+        | "YEAR_MONTH"i
+interval_time_stamp: "MICROSECOND"i| SECOND | MINUTE | HOUR | DAY | WEEK | MONTH | QUARTER | YEAR
+trim_function: "TRIM"i "(" (expr ["FROM"i expr] | ("LEADING"i | "TRAILING"i | "BOTH"i) [expr] "FROM"i expr) ")"
+parentheses: "(" ")"
+expr_list: expr ("," expr)*
+json_operator: ("->" | "->>") quoted_text
+field_identifier: dot_identifier | qual_identifier [dot_identifier]
+equal: "=" | ":="
+variable: user_variable | system_variable
+system_variable: "@@" [var_ident_type] text_or_identifier [dot_identifier]
+var_ident_type: ("GLOBAL"i | "LOCAL"i | "SESSION"i) "."
+user_variable: "@" text_or_identifier
+
+
+// General
+
+text_list: "(" quoted_text ("," quoted_text)* ")"
+text_or_identifier: identifier | text_literal
+
+expr_with_par: "(" expr ")"
+
+int_arg: "(" (int_literal) ")"
+int_pair_arg: "(" int_literal "," int_literal ")"
+
+dot_identifier: "." identifier
+identifier_list_with_par: "(" identifier_list ")"
+identifier_list: identifier ("," identifier)*
+qual_identifier: identifier [dot_identifier]
+qual_identifier_list: qual_identifier ("," qual_identifier)*
+
+charset: CHAR "SET"i | "CHARSET"i
+nchar: "NCHAR"i | "NATIONAL"i CHAR
+varchar: VARCHAR | CHAR "VARYING"i
+nvarchar: "NVARCHAR"i | "NCHAR"i ("VARYING"i | VARCHAR) | "NATIONAL"i (VARCHAR | CHAR "VARYING"i)
+binary: "BINARY"i | "CHAR BYTE"i
+key_or_index: "KEY"i | "INDEX"i
+
+direction: "ASC"i  -> asc_direction
+         | "DESC"i -> desc_direction
+
+ternary_option: "0"        -> zero_ternary_option
+              | "1"        -> one_ternary_option
+              | "DEFAULT"i -> default_ternary_option
+
+
+
+// Identifier
+
+identifier: unquoted_identifier | back_tick_text
+
+back_tick_text: BACK_TICK_TEXT
+BACK_TICK_TEXT: "`" /.*?/ "`"
+
+unquoted_identifier: UNQUOTED_IDENTIFIER
+UNQUOTED_IDENTIFIER: DIGITS+ "E"i [LETTER_WHEN_UNQUOTED_NO_DIGIT LETTER_WHEN_UNQUOTED*]
+                   | DIGITS+ LETTER_WITHOUT_FLOAT_PART LETTER_WHEN_UNQUOTED*
+                   | LETTER_WHEN_UNQUOTED_NO_DIGIT LETTER_WHEN_UNQUOTED*
+LETTER_WHEN_UNQUOTED_NO_DIGIT: "a".."z" | "A".."Z" | "_" | "$"
+LETTER_WHEN_UNQUOTED: DIGIT | LETTER_WHEN_UNQUOTED_NO_DIGIT
+LETTER_WITHOUT_FLOAT_PART: ("a".."d" | "f".."z" | "A".."D" | "F".."Z" | "_" | "$")
+
+
+// Literals
+
+literal: text_literal
+       | hex_literal
+       | bin_literal
+       | int_literal
+       | real_literal
+       | temporal_literal
+       | bool_literal
+       | null_literal
+
+// Text Literal 
+
+text_literal: charset_text quoted_text*
+
+charset_text: [UNDERSCORE_CHARSET] quoted_text -> underscore_charset_text
+            | "N"i quoted_text                 -> national_char_text
+
+quoted_text: SINGLE_QUOTED_TEXT | DOUBLE_QUOTE_TEXT
+
+UNDERSCORE_CHARSET: "_" ["a".."z" | "0".."9"]+
+SINGLE_QUOTED_TEXT: "'" /.*?/ "'"
+DOUBLE_QUOTE_TEXT: "\"" /.*?/ "\""
+
+// Hex Literal
+
+hex_literal: [UNDERSCORE_CHARSET] hex_value
+
+hex_value: "0x" [HEX_VALUE]     -> zero_x
+         | "x'" [HEX_VALUE] "'" -> x_quote
+
+HEX_VALUE: HEX_DIGIT+
+HEX_DIGIT: ("0".."9" | "a".."f" | "A".."F")
+
+// Bin Literal
+
+bin_literal: [UNDERSCORE_CHARSET] bin_value
+
+bin_value: "0b" [BIN_VALUE]     -> zero_b
+         | "b'" [BIN_VALUE] "'" -> b_quote
+
+BIN_VALUE: BIN_DIGIT+
+BIN_DIGIT: "0" | "1"
+
+// Numeric Literal
+
+int_literal: INT_LITERAL
+INT_LITERAL: [NUM_SIGN] DIGITS
+
+real_literal: REAL_LITERAL
+REAL_LITERAL: [NUM_SIGN] [[DIGITS] "."] DIGITS ("e" | "E") ["-" | "+"] DIGITS | [DIGITS] "." DIGITS
+
+NUM_SIGN: "+" | "-"
+DIGITS: DIGIT+
+DIGIT: "0".."9"
+
+// Temporal Literal
+
+temporal_literal: "DATE"i quoted_text      -> date_literal
+                | "TIME"i quoted_text      -> time_literal
+                | "TIMESTAMP"i quoted_text -> timestamp_literal
+
+// Other Literal
+
+bool_literal: "TRUE"i | "FALSE"i
+null_literal: "NULL"i
+
+// Synonyms
+
+NOT: "NOT"i | "NOT2"i
+DISTINCT: "DISTINCT"i | "DISTINCTROW"i
+COLUMNS: "COLUMNS"i | "FIELDS"i
+REGEXP: "REGEXP"i | "RLIKE"i
+DATABASE: "DATABASE"i | "SCHEMA"i
+ANY: "ANY"i | "SOME"i
+
+CHAR: "CHAR"i | "CHARACTER"i
+VARCHAR: "VARCHAR"i | "VARCHARACTER"i
+MEDIUM_TEXT: "MEDIUMTEXT"i | "LONG"i | "LONG"i VARCHAR
+
+BOOL: "BOOL"i | "BOOLEAN"i
+
+TINYINT: "TINYINT"i | "INT1"i
+SMALLINT: "SMALLINT"i | "INT2"i
+MEDIUMINT: "MEDIUMINT"i | "MIDDLEINT"i | "INT3"i
+INT: "INT"i | "INTEGER"i | "INT4"i
+BIGINT: "BIGINT"i | "INT8"i
+DECIMAL: "DECIMAL"i | "NUMERIC"i | "DEC"i | "FIXED"i
+FLOAT: "FLOAT"i | "FLOAT4"i
+DOUBLE: "DOUBLE"i | "FLOAT8"i
+REAL: "REAL"i | (DOUBLE) ["PRECISION"i]
+
+SECOND: "SECOND"i | "SQL_TSI_SECOND"i
+MINUTE: "MINUTE"i | "SQL_TSI_MINUTE"i
+HOUR: "HOUR"i | "SQL_TSI_HOUR"i
+DAY: "DAY"i | "DAYOFMONTH"i | "SQL_TSI_DAY"i
+WEEK: "WEEK"i | "SQL_TSI_WEEK"i
+MONTH: "MONTH"i | "SQL_TSI_MONTH"i
+QUARTER: "QUARTER"i | "SQL_TSI_QUARTER"i
+YEAR: "YEAR"i | "SQL_TSI_YEAR"i
+NOW: "NOW"i | "LOCALTIME"i | "LOCALTIMESTAMP"i | "CURRENT_TIMESTAMP"i
+
+GEOMETRYCOLLECTION: "GEOMETRYCOLLECTION"i | "GEOMCOLLECTION"i
+
+// Ignored
+
+WS: " " | "\t"i | "\f"i | "\r"i | "\n"i
+%ignore WS 
+
+COMMENT: "/*" ["!" [DIGITS]] | "*/"
+%ignore COMMENT
